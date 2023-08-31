@@ -1,11 +1,9 @@
 package main
 
 import (
-	"math/rand"
 	"os"
 	"sort"
 	"sync"
-	"time"
 
 	"github.com/jinzhu/configor"
 	"github.com/mcuadros/go-defaults"
@@ -15,7 +13,7 @@ import (
 
 var version = "v0.2.0"
 var log = logging.MustGetLogger("REMOTE")
-var random = rand.New(rand.NewSource(time.Now().UnixNano()))
+var confFilename = "config-remote.yaml"
 
 var args struct {
 	Addr      string `argum:"pos,req" help:"rtsp stream address"`
@@ -36,12 +34,16 @@ func init() {
 
 	argum.MustParse(&args)
 
-	if err := configor.Load(&conf, "config-remote.yaml"); err != nil {
-		log.Fatal(err)
-	}
 }
 
 func main() {
+	if _, err := os.Stat(confFilename); err != nil {
+		log.Fatalf("configuration file '%s' not found", err)
+	}
+	if err := configor.Load(&conf, confFilename); err != nil {
+		log.Fatal(err)
+	}
+
 	var servers []*Server
 	var wg sync.WaitGroup
 
