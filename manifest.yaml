@@ -1,0 +1,30 @@
+exec: './remote'
+version: v0.2.0
+author: sg3des
+url: https://github.com/neirolis/remote
+player: mjpeg
+
+transport: stdout
+serialize: mjpeg
+
+support:
+  addr: rtsp://
+  subaddr: rtsp://
+  archive: 'mjpeg'
+  monitor: true
+
+variables:
+  - name: framerate
+    default: 5
+    label: Frame Rate
+    type: number
+  - name: quality
+    default: 3
+    label: Quality
+    type: number
+    help: 1-31, where 1 is the best quality
+  - name: desc
+    value: Starts the ffmpeg process to decode video stream on a remote server over ssh
+    readonly: true
+    system: true
+    type: hidden

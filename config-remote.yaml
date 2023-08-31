@@ -1,0 +1,10 @@
+servers:
+  - addr: 127.0.0.1
+    port: 22 # default: 22
+    user: root
+    pass: password
+    exec: ffmpeg # default: ffmpeg
+
+  - addr: 127.0.0.2
+    user: root
+    key: ./path/to/key
