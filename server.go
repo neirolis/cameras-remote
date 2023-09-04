@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -11,7 +12,6 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/mattn/go-shellwords"
 	"github.com/melbahja/goph"
 	"golang.org/x/crypto/ssh"
 )
@@ -24,8 +24,10 @@ type Server struct {
 	Key  string
 	Exec string `default:"ffmpeg"`
 
-	ssh  *goph.Client
-	load float64
+	ssh    *goph.Client
+	cmd    *goph.Cmd
+	cancel context.CancelFunc
+	load   float64
 }
 
 // Dial to the server by ssh protocol
@@ -39,6 +41,10 @@ func (s *Server) Dial() (err error) {
 		if err != nil {
 			return err
 		}
+	}
+
+	if s.Port == 0 {
+		s.Port = 22
 	}
 
 	c, err := goph.NewConn(&goph.Config{
@@ -76,29 +82,47 @@ func (s *Server) CheckLoad() error {
 	return errors.New("unexpected state, failed to resolve CPU loading")
 }
 
+var ffmpegExecDefault = "ffmpeg"
+var ffmpegArgsTmpl = []string{"-hide_banner",
+	"-loglevel", "level+fatal",
+	"-y",
+	"-i", "'{{.Addr}}'",
+	"-c:v", "mjpeg",
+	"-huffman", "optimal",
+	"-q:v", "{{.Quality}}",
+	"-vf", "fps={{.FrameRate}},realtime",
+	"-f", "image2pipe", "-",
+}
+
 // StartFFmpeg process on the remote server and copy stdout/stderr
-func (s *Server) StartFFmpeg() error {
-	execLine, err := renderExecTmpl(ffmpegExecTmpl, args)
+func (s *Server) StartFFmpeg() (err error) {
+	var ffmpegArgs []string
+	for _, a := range ffmpegArgsTmpl {
+		s, err := renderExecTmpl(a, args)
+		if err != nil {
+			return err
+		}
+		ffmpegArgs = append(ffmpegArgs, s)
+	}
+
+	if s.Exec == "" {
+		s.Exec = ffmpegExecDefault
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	s.cancel = cancel
+
+	s.cmd, err = s.ssh.CommandContext(ctx, s.Exec, ffmpegArgs...)
 	if err != nil {
 		return err
 	}
 
-	execArgs, err := shellwords.Parse(execLine)
-	if err != nil {
-		return err
-	}
-
-	cmd, err := s.ssh.Command(s.Exec, execArgs...)
-	if err != nil {
-		return err
-	}
-
-	stdout, err := cmd.StdoutPipe()
+	stdout, err := s.cmd.StdoutPipe()
 	if err != nil {
 		return fmt.Errorf("failed to receive stdout pipe: %v", err)
 	}
 
-	stderr, err := cmd.StderrPipe()
+	stderr, err := s.cmd.StderrPipe()
 	if err != nil {
 		return fmt.Errorf("failed to receive stderr pipe: %v", err)
 	}
@@ -106,7 +130,7 @@ func (s *Server) StartFFmpeg() error {
 	go io.Copy(os.Stdout, stdout)
 	go io.Copy(os.Stderr, stderr)
 
-	return cmd.Run()
+	return s.cmd.Run()
 }
 
 func renderExecTmpl(s string, args interface{}) (string, error) {
@@ -122,4 +146,18 @@ func renderExecTmpl(s string, args interface{}) (string, error) {
 	}
 
 	return buf.String(), nil
+}
+
+func (s *Server) Stop() {
+	if s.cancel != nil {
+		s.cancel()
+	}
+
+	if s.cmd != nil {
+		s.cmd.Close()
+	}
+
+	if s.ssh != nil {
+		s.ssh.Close()
+	}
 }

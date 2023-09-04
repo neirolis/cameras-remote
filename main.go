@@ -2,8 +2,10 @@ package main
 
 import (
 	"os"
+	"os/signal"
 	"sort"
 	"sync"
+	"syscall"
 
 	"github.com/jinzhu/configor"
 	"github.com/mcuadros/go-defaults"
@@ -11,7 +13,7 @@ import (
 	"github.com/sg3des/argum"
 )
 
-var version = "v0.2.0"
+var version = "v0.2.2"
 var log = logging.MustGetLogger("REMOTE")
 var confFilename = "config-remote.yaml"
 
@@ -25,15 +27,13 @@ var conf struct {
 	Servers []Server `yaml:"servers"`
 }
 
-var ffmpegExecTmpl = "-hide_banner -loglevel level+info -y -i {{.Addr}} -c:v mjpeg -huffman optimal -q:v {{.Quality}} -vf fps={{.FrameRate}},realtime -f image2pipe -"
-
 func init() {
-	logFormat := `%{color}[%{module} %{shortfile}] %{message}%{color:reset}`
+	// logFormat := `%{color}[%{module} %{shortfile}] %{message}%{color:reset}`
+	logFormat := `%{message}`
 	logging.SetFormatter(logging.MustStringFormatter(logFormat))
 	logging.SetBackend(logging.NewLogBackend(os.Stderr, "", 0))
 
 	argum.MustParse(&args)
-
 }
 
 func main() {
@@ -50,7 +50,6 @@ func main() {
 	// search for a less loaded server
 	for _, s := range conf.Servers {
 		defaults.SetDefaults(&s)
-		log.Debugf("%+v", s)
 
 		wg.Add(1)
 		go func(s *Server) {
@@ -81,6 +80,14 @@ func main() {
 	sort.Slice(servers, func(i, j int) bool {
 		return servers[i].load < servers[j].load
 	})
+
+	c := make(chan os.Signal)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-c
+		servers[0].Stop()
+		os.Exit(1)
+	}()
 
 	// pick a less loaded server and run ffmpeg
 	if err := servers[0].StartFFmpeg(); err != nil {
