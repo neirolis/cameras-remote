@@ -27,7 +27,8 @@ type Server struct {
 	ssh    *goph.Client
 	cmd    *goph.Cmd
 	cancel context.CancelFunc
-	load   float64
+
+	load float64
 }
 
 // Dial to the server by ssh protocol
@@ -71,6 +72,7 @@ func (s *Server) CheckLoad() error {
 	}
 
 	ss := strings.Fields(string(out))
+
 	if len(ss) > 1 {
 		s.load, err = strconv.ParseFloat(ss[1], 32)
 		if err != nil {
@@ -84,7 +86,8 @@ func (s *Server) CheckLoad() error {
 
 var ffmpegExecDefault = "ffmpeg"
 var ffmpegArgsTmpl = []string{"-hide_banner",
-	"-loglevel", "level+fatal",
+	"-loglevel", "level+error",
+	"-timeout", "5000000",
 	"-y",
 	"-i", "'{{.Addr}}'",
 	"-c:v", "mjpeg",
@@ -155,6 +158,7 @@ func (s *Server) Stop() {
 
 	if s.cmd != nil {
 		s.cmd.Close()
+		s.cmd.Session.Close()
 	}
 
 	if s.ssh != nil {

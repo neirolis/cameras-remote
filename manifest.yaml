@@ -15,7 +15,7 @@ support:
 
 variables:
   - name: framerate
-    default: 5
+    default: 1
     label: Frame Rate
     type: number
   - name: quality
