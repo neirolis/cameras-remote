@@ -15,7 +15,7 @@ import (
 	"github.com/sg3des/argum"
 )
 
-var version = "v0.3.4"
+var version = "v0.3.5"
 var log = logging.MustGetLogger("REMOTE")
 var confFilename = "config-remote.yaml"
 
@@ -67,6 +67,7 @@ func main() {
 	if err := servers[0].Dial(); err != nil {
 		log.Fatal(err)
 	}
+	defer servers[0].Stop()
 
 	// pick a less loaded server and run ffmpeg
 	if err := servers[0].StartFFmpeg(); err != nil {
