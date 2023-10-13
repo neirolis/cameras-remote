@@ -15,7 +15,7 @@ import (
 	"github.com/sg3des/argum"
 )
 
-var version = "v0.3.5"
+var version = "v0.3.6"
 var log = logging.MustGetLogger("REMOTE")
 var confFilename = "config-remote.yaml"
 
