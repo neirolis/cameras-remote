@@ -19,7 +19,7 @@ variables:
     label: Frame Rate
     type: number
   - name: quality
-    default: 3
+    default: 5
     label: Quality
     type: number
     help: 1-31, where 1 is the best quality
